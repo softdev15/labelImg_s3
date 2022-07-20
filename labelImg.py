@@ -8,6 +8,10 @@ import shutil
 import sys
 import webbrowser as wb
 from functools import partial
+try:
+    from s3_loader import S3Loader
+except ImportError:
+    from .s3_loader import S3Loader
 
 try:
     from PyQt5.QtGui import *
@@ -163,7 +167,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.label_list.itemChanged.connect(self.label_item_changed)
         list_layout.addWidget(self.label_list)
 
-
+        self.s3_image_loader = S3Loader(self, ["jpeg","jpg"], should_lock_files=False)
+        self.s3_gt_loader = S3Loader(self, ["xml"], should_lock_files=True)
 
         self.dock = QDockWidget(get_str('boxLabelText'), self)
         self.dock.setObjectName(get_str('labels'))
@@ -220,10 +225,10 @@ class MainWindow(QMainWindow, WindowMixin):
         open = action(get_str('openFile'), self.open_file,
                       'Ctrl+O', 'open', get_str('openFileDetail'))
 
-        open_dir = action(get_str('openDir'), self.open_dir_dialog,
+        open_dir = action(get_str('openDir'), self.s3_image_loader.open_bucket_view,
                           'Ctrl+u', 'open', get_str('openDir'))
 
-        change_save_dir = action(get_str('changeSaveDir'), self.change_save_dir_dialog,
+        change_save_dir = action(get_str('changeSaveDir'), self.s3_gt_loader.open_bucket_view,
                                  'Ctrl+r', 'open', get_str('changeSavedAnnotationDir'))
 
         open_annotation = action(get_str('openAnnotation'), self.open_annotation_dialog,
@@ -1343,7 +1348,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def open_dir_dialog(self, _value=False, dir_path=None, silent=False):
         if not self.may_continue():
             return
-
+        
         default_open_dir_path = dir_path if dir_path else '.'
         if self.last_open_dir and os.path.exists(self.last_open_dir):
             default_open_dir_path = self.last_open_dir
