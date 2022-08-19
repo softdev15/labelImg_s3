@@ -170,18 +170,24 @@ class S3Loader():
         if self.selected_bucket:
             self.back_action.setEnabled(True)
             paginator = self.s3.get_paginator('list_objects')
-            result = paginator.paginate(Bucket=self.selected_bucket, Prefix=f'{self.current_path[1:]}', Delimiter='/')
-            
+            page_iterator = paginator.paginate(Bucket=self.selected_bucket, Prefix=f'{self.current_path[1:]}', Delimiter='/')
+
             # remove all existing items
             self.file_list_widget.clear()
+            folders = []
+            raw_files = []
+            for page in page_iterator:
+                
+                for folder in page.get('CommonPrefixes', []):
+                    if folder is None:
+                        continue
+                    folders.append("/".join(folder.get('Prefix').strip().split("/")[-2:])) 
+                
+                for file in page.get('Contents', []):
+                    if file is None or file.get('Key').strip()[-1] == "/" or pathlib.Path(file.get('Key')).suffix.strip(string.punctuation) not in self.acceptable_extensions:
+                        continue
+                    raw_files.append(file.get('Key'))
 
-            folders = ["/".join(x.get('Prefix').strip().split("/")[-2:]) for x in result.search('CommonPrefixes') if x is not None]
-            raw_files = [
-                x.get('Key') for x in result.search('Contents') if 
-                x is not None and
-                x.get('Key').strip()[-1] != "/" and
-                pathlib.Path(x.get('Key')).suffix.strip(string.punctuation) in self.acceptable_extensions
-            ]
             files = [self.getfilename(x) for x in raw_files]
             self.current_dir_files = raw_files
             self.file_list_widget.addItems(folders+files)
@@ -299,7 +305,7 @@ def save_xml_patch(self, s3_loader, target_file=None):
         if full_filename in s3_loader.owned_locks:
             s3_loader.owned_locks.remove(full_filename)
         s3_loader.con.commit()
-    
+
 def load_xml_patch(self, s3_loader):
     s3_loader.download_remote_file(self.file_path)
     self._parse_xml()
