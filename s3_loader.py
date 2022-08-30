@@ -245,8 +245,8 @@ class S3Loader():
         try:
             return self.cursor.execute(query, params)
         except (psycopg2.DataError, psycopg2.InternalError) as e:
-            self.logger.error(e)
-            self.logger.info('Ending current transaction after error')
+            print(e)
+            print('Ending current transaction after error')
             self.con.execute("END TRANSACTION;")
             raise e
 
