@@ -167,9 +167,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.label_list.itemChanged.connect(self.label_item_changed)
         list_layout.addWidget(self.label_list)
 
-        self.s3_image_loader = S3Loader(self, ["jpeg","jpg"], should_lock_files=False)
-        self.s3_gt_loader = S3Loader(self, ["xml"], should_lock_files=True)
-
         self.dock = QDockWidget(get_str('boxLabelText'), self)
         self.dock.setObjectName(get_str('labels'))
         self.dock.setWidget(label_list_container)
@@ -225,11 +222,26 @@ class MainWindow(QMainWindow, WindowMixin):
         open = action(get_str('openFile'), self.open_file,
                       'Ctrl+O', 'open', get_str('openFileDetail'))
 
-        open_dir = action(get_str('openDir'), self.s3_image_loader.open_bucket_view,
-                          'Ctrl+u', 'open', get_str('openDir'))
+        self.default_filename = default_filename
+        if default_filename and default_filename.startswith("s3://"):
+            self.s3_image_loader = S3Loader(self, ["jpeg","jpg"], should_lock_files=False)
+            open_dir = action(get_str('openDir'), self.s3_image_loader.open_bucket_view,
+                            'Ctrl+u', 'open', get_str('openDir'))
+        else:
+            self.s3_image_loader = None
+            open_dir = action(get_str('openDir'), self.open_dir_dialog,
+                            'Ctrl+u', 'open', get_str('openDir'))
 
-        change_save_dir = action(get_str('changeSaveDir'), self.s3_gt_loader.open_bucket_view,
+        if default_save_dir and default_save_dir.startswith("s3://"):
+            self.s3_gt_loader = S3Loader(self, ["xml"], should_lock_files=True)
+            change_save_dir = action(get_str('changeSaveDir'), self.s3_gt_loader.open_bucket_view,
                                  'Ctrl+r', 'open', get_str('changeSavedAnnotationDir'))
+        else:
+            self.s3_gt_loader = None
+            change_save_dir = action(get_str('changeSaveDir'), self.open_dir_dialog,
+                                 'Ctrl+r', 'open', get_str('changeSavedAnnotationDir'))
+                            
+        
 
         open_annotation = action(get_str('openAnnotation'), self.open_annotation_dialog,
                                  'Ctrl+Shift+O', 'open', get_str('openAnnotationDetail'))
@@ -540,6 +552,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self.label_coordinates = QLabel('')
         self.statusBar().addPermanentWidget(self.label_coordinates)
 
+        if self.s3_image_loader:
+            self.s3_image_loader.post_init()
+        if self.s3_gt_loader:
+            self.s3_gt_loader.post_init()
         # Open Dir if default file
         if self.file_path and os.path.isdir(self.file_path):
             self.open_dir_dialog(dir_path=self.file_path, silent=True)
@@ -1183,6 +1199,8 @@ class MainWindow(QMainWindow, WindowMixin):
         return '[{} / {}]'.format(self.cur_img_idx + 1, self.img_count)
 
     def show_bounding_box_from_annotation_file(self, file_path):
+        print("SHOW BOUNDING BOX FOR ANN")
+        print(self.default_save_dir)
         if self.default_save_dir is not None:
             basename = os.path.basename(os.path.splitext(file_path)[0])
             xml_path = os.path.join(self.default_save_dir, basename + XML_EXT)
@@ -1198,6 +1216,8 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.load_yolo_txt_by_filename(txt_path)
             elif os.path.isfile(json_path):
                 self.load_create_ml_json_by_filename(json_path, file_path)
+            else:
+                print("Not file:",xml_path)
 
         else:
             xml_path = os.path.splitext(file_path)[0] + XML_EXT
@@ -1299,6 +1319,7 @@ class MainWindow(QMainWindow, WindowMixin):
         return images
 
     def change_save_dir_dialog(self, _value=False):
+        print("OLD CHANGE SAVE DIR")
         if self.default_save_dir is not None:
             path = ustr(self.default_save_dir)
         else:
@@ -1346,6 +1367,7 @@ class MainWindow(QMainWindow, WindowMixin):
         
 
     def open_dir_dialog(self, _value=False, dir_path=None, silent=False):
+        print("OLD OPEN DIR")
         if not self.may_continue():
             return
         
@@ -1362,7 +1384,10 @@ class MainWindow(QMainWindow, WindowMixin):
             target_dir_path = ustr(default_open_dir_path)
         self.last_open_dir = target_dir_path
         self.import_dir_images(target_dir_path)
-        self.default_save_dir = target_dir_path
+        if self.s3_gt_loader:
+            self.default_save_dir = self.s3_gt_loader.save_dir
+        else:
+            self.default_save_dir = target_dir_path
         if self.file_path:
             self.show_bounding_box_from_annotation_file(file_path=self.file_path)
 
@@ -1425,6 +1450,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.load_file(filename)
 
     def open_next_image(self, _value=False):
+        print("OPEN NEXT IMAGE")
         # Proceeding next image without dialog if having any label
         if self.auto_saving.isChecked():
             if self.default_save_dir is not None:
@@ -1444,6 +1470,7 @@ class MainWindow(QMainWindow, WindowMixin):
             return
 
         filename = None
+        print("FILEPATH:",self.file_path)
         if self.file_path is None:
             filename = self.m_img_list[0]
             self.cur_img_idx = 0
@@ -1451,7 +1478,7 @@ class MainWindow(QMainWindow, WindowMixin):
             if self.cur_img_idx + 1 < self.img_count:
                 self.cur_img_idx += 1
                 filename = self.m_img_list[self.cur_img_idx]
-
+        print("FILENAME:",filename)
         if filename:
             self.load_file(filename)
 
@@ -1700,17 +1727,17 @@ def get_main_app(argv=None):
     # Tzutalin 201705+: Accept extra agruments to change predefined class file
     argparser = argparse.ArgumentParser()
     argparser.add_argument("image_dir", nargs="?")
+    argparser.add_argument("save_dir", nargs="?")
     argparser.add_argument("class_file",
                            default=os.path.join(os.path.dirname(__file__), "data", "predefined_classes.txt"),
                            nargs="?")
-    argparser.add_argument("save_dir", nargs="?")
     args = argparser.parse_args(argv[1:])
 
-    args.image_dir = args.image_dir and os.path.normpath(args.image_dir)
+    # args.image_dir = args.image_dir and os.path.normpath(args.image_dir)
     args.class_file = args.class_file and os.path.normpath(args.class_file)
-    args.save_dir = args.save_dir and os.path.normpath(args.save_dir)
+    # args.save_dir = args.save_dir and os.path.normpath(args.save_dir)
 
-    # Usage : labelImg.py image classFile saveDir
+    # Usage : labelImg.py image saveDir classFile
     win = MainWindow(args.image_dir,
                      args.class_file,
                      args.save_dir)

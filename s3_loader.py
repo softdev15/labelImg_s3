@@ -106,10 +106,32 @@ class S3Loader():
             PascalVocWriter._save = PascalVocWriter.save
             PascalVocWriter.save = partialmethod(save_xml_patch, self)
             self.window.closeEvent = partial(self.close_event_patch, self.window.closeEvent)
-            self.window.default_save_dir = self.save_dir
+            # self.window.default_save_dir = self.save_dir
+        # self.post_init()
+        
+    def post_init(self):
+        print("INIT")
+        if self.acceptable_extensions == ["xml"] and self.window.default_save_dir and self.window.default_save_dir.startswith("s3://"):
+            s3_uri = self.window.default_save_dir
+            bucket = s3_uri[5:].split("/")[0]
+            path = "/" + "/".join(s3_uri[5:].split("/")[1:])
+        elif self.acceptable_extensions == ["jpeg","jpg"] and self.window.default_filename and self.window.default_filename.startswith("s3://"):
+            s3_uri = self.window.default_filename
+            bucket = s3_uri[5:].split("/")[0]
+            path = "/" + "/".join(s3_uri[5:].split("/")[1:])
+        else:
+            bucket = None
+            path = None
+        if bucket and path:
+            self.selected_bucket = bucket
+            self.current_path = path
+            self.s3_file_selected()
+            self.confirm_clicked()
+        print("INIT COMPLETE")
 
 
     def confirm_clicked(self):
+        print("CONFIRM CLICKED")
         existing_files = self.current_dir_files
         selected_files = [existing_files[i.row()] for i in self.file_list_widget.selectedIndexes()]
         
@@ -166,8 +188,11 @@ class S3Loader():
         self.s3_file_selected()
 
     def s3_file_selected(self, item=None):
+        print("S3 file selected")
 
         if self.selected_bucket:
+            print("Bucket:",self.selected_bucket)
+            print("Path:",self.current_path)
             self.back_action.setEnabled(True)
             paginator = self.s3.get_paginator('list_objects')
             page_iterator = paginator.paginate(Bucket=self.selected_bucket, Prefix=f'{self.current_path[1:]}', Delimiter='/')
@@ -194,6 +219,7 @@ class S3Loader():
             self.file_list_widget.setSelectionMode(
                 QAbstractItemView.ExtendedSelection
             )
+            # print(self.current_dir_files)
             self.selection_changed()
     
     def selection_changed(self):
@@ -222,7 +248,13 @@ class S3Loader():
             self.execute("SELECT * from annotation_locks where file = %s",(file,))
             results = self.cursor.fetchall()
         if results:
-            QMessageBox.critical(self.window,"Error", "The file you're trying to open is currently locked. Annotation changes will only be saved locally unless you own the lock.")
+            QMessageBox.critical(
+                self.window,
+                "Error",
+                "The file you're trying to open is currently locked."
+                + " Annotation changes will only be saved locally unless you own the lock."
+                + "\nLock owned by: " + results[0][0]
+            )
         elif self.should_lock_files:
             
             self.execute("INSERT INTO annotation_locks (file, owner) VALUES (%s, %s)", (file, getpass.getuser()))
@@ -235,12 +267,12 @@ class S3Loader():
         dest_path = os.path.join(self.save_dir,self.getfilename(file))
         self.s3.download_file(self.selected_bucket,file, dest_path) 
 
-    def closing(self, event):
-        print("Closing")
-        for i,f in enumerate(self.to_download):
-            dest_path = os.path.join(self.save_dir, self.getfilename(name))
-            self.s3.download_file(self.selected_bucket,f, dest_path)
-            self.progress_bar.setValue(math.ceiling(i/len(self.to_download)*100))
+    # def closing(self, event):
+    #     print("Closing")
+    #     for i,f in enumerate(self.to_download):
+    #         dest_path = os.path.join(self.save_dir, self.getfilename(name))
+    #         self.s3.download_file(self.selected_bucket,f, dest_path)
+    #         self.progress_bar.setValue(math.ceiling(i/len(self.to_download)*100))
     def execute(self, query, params=None):
         try:
             return self.cursor.execute(query, params)
@@ -251,7 +283,12 @@ class S3Loader():
             raise e
 
     def download_remote_file(self, file_path):
+        print("DOWNLOAD REMOTE")
+        print(self.acceptable_extensions)
         name = self.getfilename(file_path)
+        print("Filepath:",file_path)
+        print("name:",name)
+        # print("TO DOWNLOAD:",self.to_download)
         remote_file = [x for x in self.to_download if self.getfilename(x) == name][0]
         self.download_file(remote_file)
     def load_image_patch(self, prev_call, file_path=None):
