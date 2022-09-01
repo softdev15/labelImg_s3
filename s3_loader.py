@@ -128,7 +128,7 @@ class S3Loader():
 
         if not self.should_lock_files:
             self.window.import_dir_images(self.save_dir)
-        else:
+        elif self.window.file_path:
             self.window.show_bounding_box_from_annotation_file(self.window.file_path)
 
     def back_clicked(self):
