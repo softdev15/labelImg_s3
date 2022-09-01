@@ -6,7 +6,8 @@ labelImg.egg-info*
 .*.swp
 
 build/
-dist/
+dist/*.egg 
+dist/*.gz 
 
 tags
 cscope*

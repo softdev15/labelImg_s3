@@ -1,4 +1,5 @@
 import math
+from urllib.parse import urlparse
 import getpass
 import sys
 import string
@@ -28,13 +29,18 @@ except ImportError:
 
 
 class S3Loader():
-    def __init__(self, window: QMainWindow, acceptable_extensions=[], should_lock_files=False, release_lock_individually=True):
+    def __init__(self, window: QMainWindow, acceptable_extensions=[], should_lock_files=False, release_lock_individually=True, auto_loading_dir=None):
+
+        self.automatically_load_data_from = None
         self.window = window
         self.acceptable_extensions = acceptable_extensions 
         self.should_lock_files = should_lock_files
         self.release_lock_individually = release_lock_individually
         self.owned_locks = []
         self.delete_on_close = False
+
+        if urlparse(auto_loading_dir).scheme == "s3":
+                self.automatically_load_data_from = auto_loading_dir
 
         self.save_dir = os.path.join(appdirs.user_data_dir(), "shipamax.labelImg", acceptable_extensions[0])
 
@@ -107,9 +113,15 @@ class S3Loader():
             PascalVocWriter.save = partialmethod(save_xml_patch, self)
             self.window.closeEvent = partial(self.close_event_patch, self.window.closeEvent)
             self.window.default_save_dir = self.save_dir
+            if self.automatically_load_data_from:
+                parsed_path = urlparse(self.automatically_load_data_from)
+                self.selected_bucket = parsed_path.netloc
+                self.current_path = parsed_path.path
+                self.s3_file_selected()
+                self.automatically_load_data_from = None
+                self.confirm_clicked(skip_ui_update=True)
 
-
-    def confirm_clicked(self):
+    def confirm_clicked(self, skip_ui_update=False):
         existing_files = self.current_dir_files
         selected_files = [existing_files[i.row()] for i in self.file_list_widget.selectedIndexes()]
         
@@ -126,9 +138,9 @@ class S3Loader():
             dest_path = os.path.join(self.save_dir,name)
             open(dest_path, "w").close()
 
-        if not self.should_lock_files:
+        if not self.should_lock_files and not skip_ui_update:
             self.window.import_dir_images(self.save_dir)
-        elif self.window.file_path:
+        elif not skip_ui_update and self.window.file_path:
             self.window.show_bounding_box_from_annotation_file(self.window.file_path)
 
     def back_clicked(self):
@@ -235,12 +247,6 @@ class S3Loader():
         dest_path = os.path.join(self.save_dir,self.getfilename(file))
         self.s3.download_file(self.selected_bucket,file, dest_path) 
 
-    def closing(self, event):
-        print("Closing")
-        for i,f in enumerate(self.to_download):
-            dest_path = os.path.join(self.save_dir, self.getfilename(name))
-            self.s3.download_file(self.selected_bucket,f, dest_path)
-            self.progress_bar.setValue(math.ceiling(i/len(self.to_download)*100))
     def execute(self, query, params=None):
         try:
             return self.cursor.execute(query, params)
@@ -254,9 +260,18 @@ class S3Loader():
         name = self.getfilename(file_path)
         remote_file = [x for x in self.to_download if self.getfilename(x) == name][0]
         self.download_file(remote_file)
+
     def load_image_patch(self, prev_call, file_path=None):
-        self.download_remote_file(file_path)
-        prev_call(file_path)
+        if self.automatically_load_data_from:
+            parsed_path = urlparse(self.automatically_load_data_from)
+            self.selected_bucket = parsed_path.netloc
+            self.current_path = parsed_path.path
+            self.s3_file_selected()
+            self.automatically_load_data_from = None
+            self.confirm_clicked()
+        else:
+            self.download_remote_file(file_path)
+            prev_call(file_path)
 
     def close_event_patch(self, prev_call, event):
         
@@ -285,8 +300,11 @@ def save_xml_patch(self, s3_loader, target_file=None):
     results = None
     if full_filename:
         full_filename = full_filename[0]
-        s3_loader.execute("SELECT * from annotation_locks where file = %s",(full_filename,))
-        results = s3_loader.cursor.fetchall()
+        try:
+            s3_loader.execute("SELECT * from annotation_locks where file = %s",(full_filename,))
+            results = s3_loader.cursor.fetchall()
+        except:
+            print("Could not connect to database")
     should_upload = False
     if not results and filename not in s3_loader.owned_locks:
         QMessageBox.critical(s3_loader.window, "Error", "You're trying to save a file which is not currently locked.\n The file will be saved locally but not uploaded.\n If you want to annotate it, you'll have to reopen it to make sure you own the lock.")

@@ -169,8 +169,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.label_list.itemChanged.connect(self.label_item_changed)
         list_layout.addWidget(self.label_list)
 
-        self.s3_image_loader = S3Loader(self, ["jpeg","jpg"], should_lock_files=False)
-        self.s3_gt_loader = S3Loader(self, ["xml"], should_lock_files=True)
+        self.s3_image_loader = S3Loader(self, ["jpeg","jpg"], should_lock_files=False, auto_loading_dir=default_filename)
+        self.s3_gt_loader = S3Loader(self, ["xml"], should_lock_files=True, auto_loading_dir=default_save_dir)
 
         self.dock = QDockWidget(get_str('boxLabelText'), self)
         self.dock.setObjectName(get_str('labels'))
@@ -1692,7 +1692,7 @@ def read(filename, default=None):
 def process_path(path):
     parsed = urlparse(path)
     if parsed.scheme == 's3':
-        return f"s3://{posixpath.join(parsed.netloc,os.path.normpath(parsed.path[1:]))}"
+        return f"s3://{posixpath.join(parsed.netloc,parsed.path[1:])}"
     else:
         return os.path.normpath(path)
 
@@ -1715,7 +1715,6 @@ def get_main_app(argv=None):
     argparser.add_argument("save_dir", nargs="?")
     args = argparser.parse_args(argv[1:])
 
-    img_dir = args.image_dir
     args.image_dir = args.image_dir and process_path(args.image_dir)
     args.class_file = args.class_file and process_path(args.class_file)
     args.save_dir = args.save_dir and process_path(args.save_dir)
