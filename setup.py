@@ -8,7 +8,7 @@ import sys
 import os
 
 here = os.path.abspath(os.path.dirname(__file__))
-NAME = 'labelImg'
+NAME = 's3_labelImg'
 REQUIRES_PYTHON = '>=3.0.0'
 REQUIRED_DEP = ['pyqt5', 'lxml','boto3==1.24.27','psycopg2==2.9.3','appdirs==1.4.4']
 about = {}
@@ -95,7 +95,7 @@ setup(
     packages=required_packages,
     entry_points={
         'console_scripts': [
-            'labelImg=labelImg.labelImg:main'
+            's3_labelImg=labelImg.labelImg:main'
         ]
     },
     include_package_data=True,

@@ -1,6 +1,7 @@
 resources/icons/.DS_Store
 resources.py
 labelImg.egg-info*
+s3_labelImg.egg-info*
 
 *.pyc
 .*.swp
@@ -42,3 +43,5 @@ __pycache__/
 .unison*
 .attach*
 tmp.*
+
+*.eggs/
