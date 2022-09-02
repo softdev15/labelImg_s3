@@ -24,12 +24,6 @@ with open("HISTORY.rst", "rb") as history_file:
 
 # OS specific settings
 SET_REQUIRES = []
-if _platform == "linux" or _platform == "linux2":
-   # linux
-   print('linux')
-elif _platform == "darwin":
-   # MAC OS X
-   SET_REQUIRES.append('py2app')
 
 required_packages = find_packages()
 required_packages.append('labelImg')
