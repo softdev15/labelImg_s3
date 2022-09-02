@@ -110,7 +110,7 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
     package_data={'data/predefined_classes.txt': ['data/predefined_classes.txt']},
-    options={'py2app': OPTIONS},
+    #options={'py2app': OPTIONS},
     setup_requires=SET_REQUIRES,
     # $ setup.py publish support.
     cmdclass={
