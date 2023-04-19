@@ -106,11 +106,8 @@ class S3Loader():
             PascalVocWriter._save = PascalVocWriter.save
             PascalVocWriter.save = partialmethod(save_xml_patch, self)
             self.window.closeEvent = partial(self.close_event_patch, self.window.closeEvent)
-            # self.window.default_save_dir = self.save_dir
-        # self.post_init()
         
     def post_init(self):
-        print("INIT")
         if self.acceptable_extensions == ["xml"] and self.window.default_save_dir and self.window.default_save_dir.startswith("s3://"):
             s3_uri = self.window.default_save_dir
             bucket = s3_uri[5:].split("/")[0]
@@ -127,7 +124,6 @@ class S3Loader():
             self.current_path = path
             self.s3_file_selected()
             self.confirm_clicked()
-        print("INIT COMPLETE")
 
 
     def confirm_clicked(self):
@@ -164,7 +160,6 @@ class S3Loader():
             self.list_buckets()
             self.back_action.setEnabled(False)
             self.confirm_action.setEnabled(False)
-        print("back")
     
     def list_buckets(self):
         buckets = self.s3.list_buckets()
@@ -219,7 +214,6 @@ class S3Loader():
             self.file_list_widget.setSelectionMode(
                 QAbstractItemView.ExtendedSelection
             )
-            # print(self.current_dir_files)
             self.selection_changed()
     
     def selection_changed(self):
@@ -270,12 +264,6 @@ class S3Loader():
         dest_path = os.path.join(self.save_dir,self.getfilename(file))
         self.s3.download_file(self.selected_bucket,file, dest_path) 
 
-    # def closing(self, event):
-    #     print("Closing")
-    #     for i,f in enumerate(self.to_download):
-    #         dest_path = os.path.join(self.save_dir, self.getfilename(name))
-    #         self.s3.download_file(self.selected_bucket,f, dest_path)
-    #         self.progress_bar.setValue(math.ceiling(i/len(self.to_download)*100))
     def execute(self, query, params=None):
         try:
             return self.cursor.execute(query, params)
@@ -291,9 +279,9 @@ class S3Loader():
         name = self.getfilename(file_path)
         print("Filepath:",file_path)
         print("name:",name)
-        # print("TO DOWNLOAD:",self.to_download)
         remote_file = [x for x in self.to_download if self.getfilename(x) == name][0]
         self.download_file(remote_file)
+
     def load_image_patch(self, prev_call, file_path=None):
         self.download_remote_file(file_path)
         prev_call(file_path)

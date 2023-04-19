@@ -1319,7 +1319,6 @@ class MainWindow(QMainWindow, WindowMixin):
         return images
 
     def change_save_dir_dialog(self, _value=False):
-        print("OLD CHANGE SAVE DIR")
         if self.default_save_dir is not None:
             path = ustr(self.default_save_dir)
         else:
@@ -1367,7 +1366,6 @@ class MainWindow(QMainWindow, WindowMixin):
         
 
     def open_dir_dialog(self, _value=False, dir_path=None, silent=False):
-        print("OLD OPEN DIR")
         if not self.may_continue():
             return
         
