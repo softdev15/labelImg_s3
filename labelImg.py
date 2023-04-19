@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from urllib.parse import urlparse
+import posixpath
 import argparse
 import codecs
 import os.path
@@ -1712,6 +1714,13 @@ def read(filename, default=None):
         return default
 
 
+def process_path(path):
+    parsed = urlparse(path)
+    if parsed.scheme == 's3':
+        return f"s3://{posixpath.join(parsed.netloc,parsed.path[1:])}"
+    else:
+        return os.path.normpath(path)
+
 def get_main_app(argv=None):
     """
     Standard boilerplate Qt application code.
@@ -1731,9 +1740,9 @@ def get_main_app(argv=None):
                            nargs="?")
     args = argparser.parse_args(argv[1:])
 
-    # args.image_dir = args.image_dir and os.path.normpath(args.image_dir)
-    args.class_file = args.class_file and os.path.normpath(args.class_file)
-    # args.save_dir = args.save_dir and os.path.normpath(args.save_dir)
+    args.image_dir = args.image_dir and process_path(args.image_dir)
+    args.class_file = args.class_file and process_path(args.class_file)
+    args.save_dir = args.save_dir and process_path(args.save_dir)
 
     # Usage : labelImg.py image saveDir classFile
     win = MainWindow(args.image_dir,

@@ -8,7 +8,7 @@ import sys
 import os
 
 here = os.path.abspath(os.path.dirname(__file__))
-NAME = 'labelImg'
+NAME = 's3_labelImg'
 REQUIRES_PYTHON = '>=3.0.0'
 REQUIRED_DEP = ['pyqt5', 'lxml','boto3==1.24.27','psycopg2==2.9.3','appdirs==1.4.4']
 about = {}
@@ -24,12 +24,6 @@ with open("HISTORY.rst", "rb") as history_file:
 
 # OS specific settings
 SET_REQUIRES = []
-if _platform == "linux" or _platform == "linux2":
-   # linux
-   print('linux')
-elif _platform == "darwin":
-   # MAC OS X
-   SET_REQUIRES.append('py2app')
 
 required_packages = find_packages()
 required_packages.append('labelImg')
@@ -95,7 +89,7 @@ setup(
     packages=required_packages,
     entry_points={
         'console_scripts': [
-            'labelImg=labelImg.labelImg:main'
+            's3_labelImg=labelImg.labelImg:main'
         ]
     },
     include_package_data=True,
@@ -116,7 +110,7 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
     package_data={'data/predefined_classes.txt': ['data/predefined_classes.txt']},
-    options={'py2app': OPTIONS},
+    #options={'py2app': OPTIONS},
     setup_requires=SET_REQUIRES,
     # $ setup.py publish support.
     cmdclass={
