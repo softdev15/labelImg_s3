@@ -1708,8 +1708,15 @@ def get_main_app(argv=None):
     app.setWindowIcon(new_icon("app"))
     # Tzutalin 201705+: Accept extra agruments to change predefined class file
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("image_dir", nargs="?")
-    argparser.add_argument("save_dir", nargs="?")
+    argparser.add_argument(
+        "image_dir",
+        nargs="?",
+        help="Provide an S3 path ('S3://...'). To filter for a specific file, add the basename (without extension) to the path.")
+    argparser.add_argument(
+        "save_dir",
+        nargs="?",
+        help="Provide an S3 path to the directory containing the relevant annotations (XMLs)." \
+            + " This directory will be filtered internally to find just those corresponding to the images required.")
     argparser.add_argument("class_file",
                            default=os.path.join(os.path.dirname(__file__), "data", "predefined_classes.txt"),
                            nargs="?")
