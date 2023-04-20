@@ -225,18 +225,27 @@ class S3Loader():
 
 
     def download_file(self, file):
+        print("DOWNLOADING FILE:", file, "| Should lock:", self.should_lock_files)
         results = None
         file_to_release = None
         if self.release_lock_individually and self.owned_locks:
-                file_to_release = self.owned_locks[0]
+            file_to_release = self.owned_locks[0]
                
         if self.should_lock_files:
             self.execute("SELECT * from annotation_locks where file = %s",(file,))
             results = self.cursor.fetchall()
-        if results:
-            QMessageBox.critical(self.window,"Error", "The file you're trying to open is currently locked. Annotation changes will only be saved locally unless you own the lock.")
-        elif self.should_lock_files:
-            
+            print("Results:", results)
+        lock_owner = results[0][0] if results else None
+        if results and lock_owner != getpass.getuser():
+            QMessageBox.critical(
+                self.window,
+                "Error",
+                "The file you're trying to open is currently locked."
+                + " Annotation changes will only be saved locally."
+                + "\nLock owned by: " + lock_owner
+            )
+        elif self.should_lock_files and not results:
+            print("Locking file:", file)
             self.execute("INSERT INTO annotation_locks (file, owner) VALUES (%s, %s)", (file, getpass.getuser()))
             self.owned_locks.append(file)
         
@@ -251,13 +260,17 @@ class S3Loader():
         try:
             return self.cursor.execute(query, params)
         except (psycopg2.DataError, psycopg2.InternalError) as e:
-            self.logger.error(e)
-            self.logger.info('Ending current transaction after error')
+            print(e)
+            print('Ending current transaction after error')
             self.con.execute("END TRANSACTION;")
             raise e
 
     def download_remote_file(self, file_path):
+        print("DOWNLOAD REMOTE")
+        print(self.acceptable_extensions)
         name = self.getfilename(file_path)
+        print("Filepath:",file_path)
+        print("name:",name)
         remote_file = [x for x in self.to_download if self.getfilename(x) == name][0]
         self.download_file(remote_file)
 
@@ -293,7 +306,7 @@ class S3Loader():
     def getfilename(self,file):
         return file.split("/")[-1]
 
-def save_xml_patch(self, s3_loader, target_file=None):
+def save_xml_patch(self, s3_loader: S3Loader, target_file=None):
     filename = s3_loader.getfilename(target_file)
     self._save(target_file)
     full_filename = [x for x in s3_loader.to_download if filename in x]
@@ -306,11 +319,11 @@ def save_xml_patch(self, s3_loader, target_file=None):
         except:
             print("Could not connect to database")
     should_upload = False
-    if not results and filename not in s3_loader.owned_locks:
+    if not results and full_filename not in s3_loader.owned_locks:
         QMessageBox.critical(s3_loader.window, "Error", "You're trying to save a file which is not currently locked.\n The file will be saved locally but not uploaded.\n If you want to annotate it, you'll have to reopen it to make sure you own the lock.")
     elif results and results[0][0] != getpass.getuser():
         QMessageBox.critical(s3_loader.window, "Error", "You're trying to save a file which is currently locked by another user.\n The file will be saved locally but not uploaded.\n If you want to annotate it, you'll have to reopen it after it is unlocked.")
-    elif results and results[0][0] == getpass.getuser() and filename not in s3_loader.owned_locks:
+    elif results and results[0][0] == getpass.getuser() and full_filename not in s3_loader.owned_locks:
         ret = QMessageBox.question(s3_loader.window, "", "You're trying to save a file which is currently locked by you, but whose lock was not created in this session. Do you want to upload the result and release the lock?")
         should_upload = QMessageBox.Yes == ret
     else:
