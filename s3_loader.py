@@ -92,11 +92,11 @@ class S3Loader():
         self.file_list_widget.itemDoubleClicked.connect(self.selection_double_clicked)
         try:
             self.con = psycopg2.connect(
-                host=os.environ["PGHOST"],
-                port=os.environ["PGPORT"],
-                database=os.environ["PGDATABASE"],
-                user=os.environ["PGUSER"],
-                password=os.environ["PGPASSWORD"]
+                host=os.getenv("META_PGHOST") or os.environ["PGHOST"],
+                port=os.getenv("META_PGPORT") or os.environ["PGPORT"],
+                database=os.getenv("META_PGDATABASE") or os.environ["PGDATABASE"],
+                user=os.getenv("META_PGUSER") or os.environ["PGUSER"],
+                password=os.getenv("META_PGPASSWORD") or os.environ["PGPASSWORD"]
             )
             self.cursor = self.con.cursor()
         except Exception as e:
